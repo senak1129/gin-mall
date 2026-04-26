@@ -11,7 +11,17 @@ const (
 	SkillProductKey     = "skill:product:%d"
 	SkillProductListKey = "skill:product_list"
 	SkillProductUserKey = "skill:user:%s"
+	SkillStockKey       = "skill:stock:%d"
+	SkillUserProductKey = "skill:user:%d:%d"
 )
+
+func SkillStockKeyByProductId(productId uint) string {
+	return fmt.Sprintf(SkillStockKey, productId)
+}
+
+func SkillUserKey(userId, productId uint) string {
+	return fmt.Sprintf(SkillUserProductKey, userId, productId)
+}
 
 func ProductViewKey(id uint) string {
 	return fmt.Sprintf("view:product:%s", strconv.Itoa(int(id)))

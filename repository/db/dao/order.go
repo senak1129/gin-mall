@@ -73,6 +73,14 @@ func (dao *OrderDao) GetOrderById(id, uId uint) (r *model.Order, err error) {
 	return
 }
 
+func (dao *OrderDao) GetOrderByOrderNum(orderNum uint64) (r *model.Order, err error) {
+	err = dao.DB.Model(&model.Order{}).
+		Where("order_num = ?", orderNum).
+		First(&r).Error
+
+	return
+}
+
 // ShowOrderById 获取订单详情
 func (dao *OrderDao) ShowOrderById(id, uId uint) (r *types.OrderListResp, err error) {
 	err = dao.DB.Model(&model.Order{}).

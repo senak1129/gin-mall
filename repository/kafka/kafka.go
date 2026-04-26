@@ -3,6 +3,7 @@ package kafka
 import (
 	"context"
 	"fmt"
+	"sort"
 	"strings"
 	"sync"
 	"time"
@@ -24,6 +25,18 @@ type Kafka struct {
 }
 
 var globalKafkaClient *sync.Map
+
+func DefaultKey() string {
+	if conf.Config == nil || conf.Config.KafKa == nil || len(conf.Config.KafKa) == 0 {
+		return ""
+	}
+	keys := make([]string, 0, len(conf.Config.KafKa))
+	for k := range conf.Config.KafKa {
+		keys = append(keys, k)
+	}
+	sort.Strings(keys)
+	return keys[0]
+}
 
 func GetClient(key string) (*Kafka, error) {
 	val, ok := globalKafkaClient.Load(key)
@@ -70,6 +83,9 @@ func SendMessagePartitionPar(ctx context.Context, key, topic, value, partitionKe
 }
 
 func InitKafka() {
+	if globalKafkaClient == nil {
+		globalKafkaClient = new(sync.Map)
+	}
 	for k, v := range conf.Config.KafKa {
 		key := k
 		val := v

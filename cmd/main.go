@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"fmt"
 
 	conf "github.com/CocaineCong/gin-mall/config"
@@ -12,6 +13,7 @@ import (
 	"github.com/CocaineCong/gin-mall/repository/kafka"
 	"github.com/CocaineCong/gin-mall/repository/rabbitmq"
 	"github.com/CocaineCong/gin-mall/routes"
+	"github.com/CocaineCong/gin-mall/service"
 
 	_ "github.com/apache/skywalking-go"
 )
@@ -38,5 +40,6 @@ func loading() {
 }
 
 func scriptStarting() {
-	// 启动一些脚本
+	ctx := context.Background()
+	_ = service.RunSkillOrderConsumer(ctx)
 }

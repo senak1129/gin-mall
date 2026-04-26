@@ -19,3 +19,7 @@ type ListSkillProductReq struct {
 type GetSkillProductReq struct {
 	ProductId uint `json:"product_id" form:"product_id"`
 }
+
+type SkillPurchaseResp struct {
+	OrderNum uint64 `json:"order_num"`
+}
