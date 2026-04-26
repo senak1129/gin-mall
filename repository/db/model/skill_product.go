@@ -19,4 +19,6 @@ type SkillProduct2MQ struct {
 	Money          float64 `json:"money"`
 	AddressId      uint    `json:"address_id"`
 	Key            string  `json:"key"`
+	OrderNum       uint64  `json:"order_num"`
+	Num            int     `json:"num"`
 }
