@@ -57,26 +57,31 @@ func (s *SkillProductSrv) InitSkillGoods(ctx context.Context) (resp interface{},
 
 	// 导入数据库的同时，初始化缓存
 	rc := cache.RedisClient
+	//删除旧的缓存
 	_, _ = rc.Del(ctx, cache.SkillProductListKey).Result()
 	for i := range spList {
+		//把每个秒杀商品转成 JSON 存入 Redis List
 		jsonBytes, errx := json.Marshal(spList[i])
 		if errx != nil {
 			log.LogrusObj.Infoln(errx)
 			return
 		}
 		jsonString := string(jsonBytes)
+		////把每个秒杀商品转成 JSON 存入 Redis List
 		_, errx = rc.LPush(ctx, cache.SkillProductListKey, jsonString).Result()
 		if errx != nil {
 			log.LogrusObj.Infoln(errx)
 			return nil, errx
 		}
 
+		//商品详情
 		errx = rc.Set(ctx, fmt.Sprintf(cache.SkillProductKey, spList[i].ProductId), jsonString, 0).Err()
 		if errx != nil {
 			log.LogrusObj.Infoln(errx)
 			return nil, errx
 		}
 
+		//商品数量
 		errx = rc.Set(ctx, cache.SkillStockKeyByProductId(spList[i].ProductId), spList[i].Num, 0).Err()
 		if errx != nil {
 			log.LogrusObj.Infoln(errx)
@@ -92,6 +97,7 @@ func (s *SkillProductSrv) ListSkillGoods(ctx context.Context) (resp interface{},
 	// 读缓存
 	rc := cache.RedisClient
 	// 获取列表
+	//先读 Redis 缓存
 	skillProductList, err := rc.LRange(ctx, cache.SkillProductListKey, 0, -1).Result()
 	if err != nil {
 		log.LogrusObj.Infoln(err)
@@ -180,6 +186,7 @@ func (s *SkillProductSrv) SkillProduct(ctx context.Context, req *types.SkillProd
 		return nil, errors.New("重复抢购")
 	}
 
+	//订单号
 	orderNum := genOrderNum(req.ProductId, u.Id)
 	msg := &model.SkillProduct2MQ{
 		SkillProductId: req.SkillProductId,
@@ -231,6 +238,7 @@ func RunSkillOrderConsumer(ctx context.Context) error {
 		}
 
 		orderDao := dao.NewOrderDao(ctx)
+		//幂等
 		_, err = orderDao.GetOrderByOrderNum(req.OrderNum)
 		if err == nil {
 			return nil
@@ -250,11 +258,13 @@ func RunSkillOrderConsumer(ctx context.Context) error {
 			Money:     req.Money,
 		}
 
+		//创建订单
 		err = orderDao.CreateOrder(order)
 		if err != nil {
 			return err
 		}
 
+		//把订单加入 Redis 延时队列（15 分钟超时未支付自动取消）
 		data := redis.Z{
 			Score:  float64(time.Now().Unix()) + 15*time.Minute.Seconds(),
 			Member: req.OrderNum,
@@ -265,6 +275,17 @@ func RunSkillOrderConsumer(ctx context.Context) error {
 	}))
 }
 
+/*
+Lua 脚本干了 3 件原子操作：
+判断库存是否 > 0
+没库存 → 返回 0 → 前端提示：已售罄
+判断用户是否已经买过
+买过 → 返回 -1 → 提示：重复抢购
+库存 -1
+记录用户已购买
+为什么要用 Lua？
+保证 检查库存 + 扣库存 + 记录用户 三个动作一气呵成，不会超卖、不会重复购买
+*/
 const skillProductLua = `
 local stock = tonumber(redis.call('GET', KEYS[1]) or '0')
 if stock <= 0 then
@@ -278,6 +299,7 @@ redis.call('SET', KEYS[2], '1', 'EX', tonumber(ARGV[1]))
 return 1
 `
 
+// 生成订单号
 func genOrderNum(productId, userId uint) uint64 {
 	number := fmt.Sprintf("%09v", rand.New(rand.NewSource(time.Now().UnixNano())).Int31n(1000000000))
 	number = number + strconv.Itoa(int(productId)) + strconv.Itoa(int(userId))
